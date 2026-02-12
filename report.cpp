@@ -10,6 +10,7 @@
 #include <numeric>
 #include <stdio.h>
 #include <iterator>
+#include <gmp.h>
 
 using namespace std;
 
@@ -94,66 +95,6 @@ tuple<int,int,int> analyzeSignatureCluster(vector<Signature> &SignatureCluster, 
     unsigned long long llSVLen=0;
     int Pos=0, SVLen=0, MeanSVLen=0;
     int CBegin=0, CEnd=SignatureCluster.size();
-    // if (SVType=="INS")
-    // {
-    //     int MinBinSize=10;
-    //     int BinNumber=100;
-    //     int MaxSVLen=0, MinSVLen=0xffffff;
-    //     for (int i=CBegin;i<CEnd;++i)
-    //     {
-    //         llPos+=SignatureCluster[i].Begin;
-    //         MaxSVLen=max(MaxSVLen,SignatureCluster[i].Length);
-    //         MinSVLen=min(MinSVLen,SignatureCluster[i].Length);
-    //         llSVLen+=SignatureCluster[i].Length;
-    //     }
-    //     Pos=llPos/(CEnd-CBegin);
-    //     MeanSVLen=llSVLen/(CEnd-CBegin);
-    //     int BinSize=(MaxSVLen-MinSVLen)/BinNumber+1;
-    //     if (BinSize<MinBinSize) SVLen=MeanSVLen;
-    //     else
-    //     {
-    //         vector<vector<int>> SigBins;
-    //         for (int i=0;i<BinNumber;++i)
-    //         {
-    //             SigBins.push_back(vector<int>());
-    //         }
-    //         for (int i=CBegin;i<CEnd;++i)
-    //         {
-    //             SigBins[(SignatureCluster[i].Length-MinSVLen)/BinSize].push_back(i);
-    //         }
-    //         int MaxQualifiledIndex=-1;
-    //         for (int i=0;i<BinNumber;++i)
-    //         {
-    //             if (SigBins[i].size()<3) continue;
-    //             MaxQualifiledIndex=i;
-    //         }
-    //         if (MaxQualifiledIndex!=-1)
-    //         {
-    //             llSVLen=0;
-    //             for (int i=0;i<SigBins[MaxQualifiledIndex].size();++i)
-    //             {
-    //                 llSVLen+=SignatureCluster[SigBins[MaxQualifiledIndex][i]].Length;
-    //             }
-    //             SVLen=llSVLen/SigBins[MaxQualifiledIndex].size();
-    //         }
-    //         else SVLen=MeanSVLen;
-    //     }
-    //     // for (int i=CBegin;i<CEnd;++i)
-    //     // {
-    //     //     llPos+=SignatureCluster[i].Begin;
-    //     //     llSVLen+=SignatureCluster[i].Length;
-    //     // }
-    //     // Pos=llPos/(CEnd-CBegin);
-    //     // MeanSVLen=llSVLen/(CEnd-CBegin);
-    //     // for (int i=CBegin;i<CEnd;++i)
-    //     // {
-    //     //     if (SignatureCluster[i].Length<MeanSVLen*2)
-    //     //     {
-    //     //         SVLen=max(SVLen,SignatureCluster[i].Length);
-    //     //     }
-    //     // }
-    // }
-    // else
     if (Args.WeightPosLength)
     {
         double WeightSum=0.0;
@@ -256,13 +197,11 @@ template <typename ValueType,typename IterType> class MemberIter
     {
         return BaseIter!=Other;
     }
-    // virtual ValueType operator* ();//Can't use virtual in template!
 };
 
 template <typename ValueType,typename IterType> class BeginIter : public MemberIter<ValueType,IterType>
 {
     public:
-    // using MemberIter<ValueType,IterType>::MemberIter<ValueType,IterType>;
     BeginIter(IterType A):MemberIter<ValueType,IterType>(A){}
     ValueType operator* ()
     {
@@ -325,10 +264,7 @@ int getLengthSDRatioScore(vector<Signature> &SignatureCluster, int SVLen, double
     double LengthSD=calcSD(LengthIter<int,vector<Signature>::iterator>(SignatureCluster.begin()),LengthIter<int,vector<Signature>::iterator>(SignatureCluster.end()));
     if (SD!=NULL) *SD=LengthSD;
     return MAX(0.0,100.0-(LengthSD/(double)SVLen*100.0));
-    // return MAX(0.0,100.0-(LengthSD/(double)(max(SVLen,500))*100.0));
     int SizePenalty=0;
-    // if (SignatureCluster.size()<4) SizePenalty=4-SignatureCluster.size();
-    // return MAX(0.0,100.0-(LengthSD/(double)SVLen*500.0-SizePenalty));
 }
 
 double getAverageCoverage(int Begin, int End, float * CoverageWindows, Arguments & Args, float* CoverageWindowsSums, float* CheckPoints, int CheckPointInterval)
@@ -374,19 +310,36 @@ double getAverageCoverage(int Begin, int End, float * CoverageWindows, Arguments
     return Cov;
 }
 
-bool statCluster(vector<Signature> &SignatureCluster, int & SS, int &ST, int& SS2, int& ST2)
+bool statCluster(vector<Signature> &SignatureCluster, int & SS, int &ST, int& SS2, int& ST2, bool ExcludeHP0=false)
 {
     SS=0;
     SS2=0;
     set<string> SupportTemps,SupportTemps2;//,SupportTempsCigar;
-    for (int i =0;i<SignatureCluster.size();++i)
+    if (ExcludeHP0)
     {
-        ++SS;
-        SupportTemps.insert(SignatureCluster[i].TemplateName);
-        if (SignatureCluster[i].Tech==1)
+        for (int i =0;i<SignatureCluster.size();++i)
         {
-            ++SS2;
-            SupportTemps2.insert(SignatureCluster[i].TemplateName);
+            if (SignatureCluster[i].HP==0) continue;
+            ++SS;
+            SupportTemps.insert(SignatureCluster[i].TemplateName);
+            if (SignatureCluster[i].Tech==1)
+            {
+                ++SS2;
+                SupportTemps2.insert(SignatureCluster[i].TemplateName);
+            }
+        }
+    }
+    else
+    {
+        for (int i =0;i<SignatureCluster.size();++i)
+        {
+            ++SS;
+            SupportTemps.insert(SignatureCluster[i].TemplateName);
+            if (SignatureCluster[i].Tech==1)
+            {
+                ++SS2;
+                SupportTemps2.insert(SignatureCluster[i].TemplateName);
+            }
         }
     }
     ST=SupportTemps.size();
@@ -418,8 +371,6 @@ string calc_GL_cute(int c0, int c1)
     double ori_GL00=pow((1.0-err),c0)*pow(err,c1)*(1.0-prior)/2.0;
     double ori_GL11=pow(err,c0)*pow(1.0-err,c1)*(1.0-prior)/2.0;
     double ori_GL01=pow(0.5, c0+c1)*prior;
-    // if (ori_GL11>ori_GL01 && ori_GL11>ori_GL00) return "1/1";
-    // return "0/1";
     double log10Ps[3]={log10(ori_GL00),log10(ori_GL01),log10(ori_GL11)};
     double MaxLog10=-log10Ps[0];
     for (int i=1;i<3;++i)
@@ -465,7 +416,6 @@ double poisson(double lambda, int x)
 
 int getNAllTemplates(vector<Signature> & Cluster,const Contig & TheContig, vector<Sam>& SamFiles, int Start, int End)
 {
-    // for (auto s : Cluster) {Start=MIN(s.Begin,Start);End=MAX(s.Begin,End);}
     set<string> Temps;
     for (int k=0;k<SamFiles.size();++k)
     {
@@ -474,7 +424,6 @@ int getNAllTemplates(vector<Signature> & Cluster,const Contig & TheContig, vecto
         while(sam_itr_next(SamFiles[k].SamFile, RegionIter, br) >=0)//read record
         {
 	        if (!align_is_primary(br)) continue;
-            // for (auto s: Cluster)
             if (br->core.pos<Start && br->core.pos+bam_cigar2rlen(br->core.n_cigar,bam_get_cigar(br))>=End) Temps.insert(bam_get_qname(br));
         }
         bam_destroy1(br);
@@ -484,8 +433,6 @@ int getNAllTemplates(vector<Signature> & Cluster,const Contig & TheContig, vecto
 
 int getNAllTemplates(const Contig & TheContig, SegmentSet & AllPrimarySegments, int Start, int End)
 {
-    // for (auto s : Cluster) {Start=MIN(s.Begin,Start);End=MAX(s.Begin,End);}
-    // set<string> Temps;
     tuple<int, int> SearchRange=AllPrimarySegments.getInvolved(Start,End);
     int Result=0;
     for (int i=get<0>(SearchRange);i<get<1>(SearchRange);++i)
@@ -525,16 +472,6 @@ void resizeCluster(vector<Signature> &Cluster, int MaxSize)
     int NewEnd=NewBegin+MaxSize;
     Cluster.insert(Cluster.begin(),make_move_iterator(vector<Signature>::iterator(&Cluster[NewBegin])),make_move_iterator(vector<Signature>::iterator(&Cluster[NewEnd])));
     Cluster.resize(MaxSize);
-    // if (Cluster.size()<=2*MaxSize) return;
-    // int Step=Cluster.size()/MaxSize;
-    // auto InitialFirst=Cluster.begin();
-    // int NewSize=0;
-    // for (int i=0;i<Cluster.size();i+=Step)
-    // {
-    //     Cluster.insert(vector<Signature>::iterator(&Cluster[NewSize]),make_move_iterator(vector<Signature>::iterator(&Cluster[i])),make_move_iterator(i<Cluster.size()?vector<Signature>::iterator(&Cluster[i+1]):Cluster.end()));
-    //     ++NewSize;
-    // }
-    // Cluster.resize(NewSize);
 }
 
 const short Alphabet[128]={//NATGC=01234
@@ -573,7 +510,6 @@ string getInsConsensus(int SVLen, vector<Signature> & SignatureCluster, double E
             for (int j=0;j<SignatureCluster.size();++j)
             {
                 if (abs(int(SignatureCluster[j].InsBases.length())-SVLen)>SVLen*Endurance) continue;
-                // if (SignatureCluster[j].Length!=SignatureCluster[j].InsBases.length()) fprintf(stderr,"warning! not the same!%d,%d\n",SignatureCluster[j].Length,SignatureCluster[j].InsBases.length());
                 ++Counts[
                     Alphabet[
                         SignatureCluster[j].InsBases[(int)(((double)i)/((double)SVLen)*SignatureCluster[j].InsBases.length())]
@@ -589,12 +525,23 @@ string getInsConsensus(int SVLen, vector<Signature> & SignatureCluster, double E
     return Consensus;
 }
 
-void VCFRecord::calcM3L(vector<Signature> & SignatureCluster)
+void VCFRecord::calcM3L(vector<Signature> & SignatureCluster, bool ExcludeHP0)
 {
     vector<int> Lengths;
-    for (auto s : SignatureCluster)
+    if (ExcludeHP0)
     {
-        Lengths.push_back(s.Length);
+        for (auto s : SignatureCluster)
+        {
+            if (s.HP==0) continue;
+            Lengths.push_back(s.Length);
+        }
+    }
+    else
+    {
+        for (auto s : SignatureCluster)
+        {
+            Lengths.push_back(s.Length);
+        }
     }
     sort(Lengths.data(),Lengths.data()+Lengths.size());
     MinLength=Lengths[0];
@@ -624,6 +571,29 @@ double getWeightSum(vector<Signature> & SignatureCluster)
     return WeightSum;
 }
 
+inline void biCdf(mpq_t Result, unsigned n, const mpq_t p, unsigned Start, unsigned End)
+{
+    mpq_t One,Pq,Subp;
+    mpz_t P;
+    mpq_set_ui(Result,0,1);
+    mpz_init(P);
+    mpq_init(One);
+    mpq_init(Pq);
+    mpq_init(Subp);
+    mpq_set_ui(One,1,1);
+    mpq_sub(Subp,One,p);
+    for (int i=Start;i<End;++i)
+    {
+        mpz_set_ui(P,1);
+        for (int j=n-i+1;j<=n;++j) mpz_mul_ui(P,P,j);
+        for (int j=1;j<=i;++j) mpz_tdiv_q_ui(P,P,j);
+        mpq_set_z(Pq,P);
+        for (int j=0;j<i;++j) mpq_mul(Pq,Pq,p);
+        for (int j=i;j<n;++j) mpq_mul(Pq,Pq,Subp);
+        mpq_add(Result,Result,Pq);
+    }
+}
+
 int VN=0;
 VCFRecord::VCFRecord()
 : SVLen(0),SVType(),SS(0),ST(0),SS2(0),ST2(0),LS(0),CV(0),CR(0),MinLength(0),MaxLength(0),MediumLength(0),Precise(0),InsConsensus(""),SVTypeI(0),CHROM(),Pos(0),ID(),REF(),ALT(),QUAL(),FILTER(),INFO(),Sample(),Keep(false)
@@ -631,18 +601,59 @@ VCFRecord::VCFRecord()
 VCFRecord::VCFRecord(const Contig & TheContig,vector<Signature> & SignatureCluster, ClusterCore &Core, SegmentSet & AllPrimarySegments, float* CoverageWindows, double WholeCoverage, Arguments& Args, float * CoverageWindowsSums, float * CheckPoints, int CheckPointInterval)
 : SVLen(0),SVType(),CN(0),SS(0),ST(0),SS2(0),ST2(0),LS(0),CV(0),CR(0),MinLength(0),MaxLength(0),MediumLength(0),Precise(0),InsConsensus(""),SVTypeI(0),CHROM(),Pos(0),ID(),REF(),ALT(),QUAL(),FILTER(),INFO(),Sample(),PSD(-1),Keep(false)
 {
+    SVType=getSVType(SignatureCluster);
+    SVTypeI=SignatureCluster[0].SupportedSV;
+    double HPRatio=Args.HPRatio[SVTypeI], HomoRatio=Args.HomoRatio[SVTypeI], HomoMinusRatio=Args.HomoMinusRatio[SVTypeI];
+    double CutOffRatio=1.0;
     assert(SignatureCluster.size()>=0);
     resizeCluster(SignatureCluster,Args.MaxClusterSize);
     Keep=true;
+    HPCounts[0]=0;HPCounts[1]=0;HPCounts[2]=0;
+    for (int i=0;i<SignatureCluster.size();++i)
+    {
+        ++HPCounts[SignatureCluster[i].HP];
+    }
+    //HP GT hypothesis testing
+    bool HPGTKeep=false;
+
+    //HP Ratio
+    double SHPRatio=float(HPCounts[1]+HPCounts[2])/float(HPCounts[0]+HPCounts[1]+HPCounts[2]);
+    double GTHPRatio=0.8, GTHomoRatio=0.6;
+    float HPRatios[3]={0,0,0};
+    if (SHPRatio>HPRatio || SHPRatio>GTHPRatio)
+    {
+        for (int i=0;i<3;++i) HPRatios[i]=float(HPCounts[i])/float(SignatureCluster.size());
+    }
+    if (SHPRatio>HPRatio)
+    {
+        if (HPRatios[1]/(HPRatios[1]+HPRatios[2])>HomoRatio || HPRatios[2]/(HPRatios[1]+HPRatios[2])>HomoRatio)
+        {
+            sort(SignatureCluster.begin(),SignatureCluster.end(),[](Signature &a, Signature&b){
+                return a.HP==b.HP? a<b : a.HP<b.HP;
+            });
+            int End0=0;
+            for (;End0<SignatureCluster.size();++End0) if (SignatureCluster[End0].HP!=0) break;
+            SignatureCluster.erase(SignatureCluster.begin(),SignatureCluster.begin()+End0);
+            CutOffRatio-=Args.HomoMinus[SVTypeI];
+            CutOffRatio-=HomoMinusRatio*(SHPRatio-HPRatio);
+        }
+        else
+        {
+            CutOffRatio-=Args.NonHomoMinus[SVTypeI];
+            CutOffRatio-=Args.NonHomoMinusRatio[SVTypeI]*(SHPRatio-HPRatio);
+        }
+    }
+    else
+    {
+        CutOffRatio+=Args.LowHPPlus[SVTypeI]*(HPRatio-SHPRatio);
+        CutOffRatio+=Args.LowHPPlusRatio[SVTypeI]*(HPRatio-SHPRatio);
+    }
     statCluster(SignatureCluster,SS,ST,SS2,ST2);
-    SVType=getSVType(SignatureCluster);
-    SVTypeI=SignatureCluster[0].SupportedSV;
-    // if (SVTypeI==0 or SVTypeI==1) if (!cflag) {Keep=false;return;}
     calcM3L(SignatureCluster);
     tuple<int,int,int> Site=analyzeSignatureCluster(SignatureCluster, SVType, Args);
     int MeanSVLen=get<2>(Site);
     SVLen=get<1>(Site);
-    Pos=get<0>(Site);//0-bsed now, after ref and alt then transform to 1-based, but should be the base before variantion. End should be the last base, but also should be transform to 1-based. So they don't change.
+    Pos=get<0>(Site);//0-based now, after ref and alt then transform to 1-based, but should be the base before variantion. End should be the last base, but also should be transform to 1-based. So they don't change.
     //VCF version 4.2 says if alt is <ID>, the pos is the base preceding the polymorphism. No mention of the "base 1" rule.
     
     if (SVLen<=0) {Keep=false;return;}
@@ -674,12 +685,6 @@ VCFRecord::VCFRecord(const Contig & TheContig,vector<Signature> & SignatureClust
         if (HasLeft) INFO+="L";
         if (HasRight) INFO+="R";
     }
-    // bool Covered=false;
-    // if (SVType=="DUP")
-    // {
-    //     for (int i=0;i<SignatureCluster.size();++i) if (SignatureCluster[i].Covered) {Covered=true;break;}
-    // }
-    // if (SVType=="DUP" && !Covered) {Keep=false;return;}
     double Score=ST;
     if (Args.WeightFilter)
     {
@@ -687,6 +692,7 @@ VCFRecord::VCFRecord(const Contig & TheContig,vector<Signature> & SignatureClust
     }
     if (Args.NoFilter) Keep=true;
     else if (ST<2) {Keep=false;return;}
+    else if (HPGTKeep) Keep=true;
     else if (Args.Filter2ST) Keep=true;
     else if (ST2>30) Keep=true;
     else
@@ -705,34 +711,26 @@ VCFRecord::VCFRecord(const Contig & TheContig,vector<Signature> & SignatureClust
             Keep=true;
             if (!(HasLeft&&HasRight)) {Keep=false;return;}
         }
-        if (Score>=ASSBases[SVTypeI][0]+WholeCoverage*ASSCoverageMulti[SVTypeI][0] && LS>=LSDRSs[SVTypeI][0]) {Keep=true;}
+        if (Score>=(ASSBases[SVTypeI][0]+WholeCoverage*ASSCoverageMulti[SVTypeI][0])*CutOffRatio && LS>=LSDRSs[SVTypeI][0]*CutOffRatio) {Keep=true;}
         else
         {
-            if (Score<ASSBases[SVTypeI][1]+WholeCoverage*ASSCoverageMulti[SVTypeI][1]) {Keep=false;return;}
-            if (LS<LSDRSs[SVTypeI][1]) {Keep=false;return;}
+            if (Score<(ASSBases[SVTypeI][1]+WholeCoverage*ASSCoverageMulti[SVTypeI][1])*CutOffRatio) {Keep=false;return;}
+            if (LS<LSDRSs[SVTypeI][1]*CutOffRatio) {Keep=false;return;}
         }
     }
     if (SVType=="INS") InsConsensus=getInsConsensus(SVLen,SignatureCluster);
 
-    genotype(TheContig,AllPrimarySegments,CoverageWindows,CoverageWindowsSums,CheckPoints,CheckPointInterval,Args);
+    if (!HPGTKeep && Sample.count("GT")==0) genotype(TheContig,AllPrimarySegments,CoverageWindows,CoverageWindowsSums,CheckPoints,CheckPointInterval,Args);
     ID=".";
     QUAL=".";
     FILTER="PASS";
     CHROM=TheContig.Name;
     if (SVTypeI==2)
     {
-        // double CCN=0;
-        // for (int i=0;i<SignatureCluster.size();++i)
-        // {
-        //     CCN+=SignatureCluster[i].CN;
-        // }
-        // CCN/=(double)(SignatureCluster.size());
-        // CN=int(CCN+0.5)
         for (int i=0;i<SignatureCluster.size();++i)
         {
             CN=max(CN, SignatureCluster[i].CN);
         }
-        // CN=int((double)(SS)/(double)(ST)+0.5);
     }
     #ifdef DEBUG
     MergeStrings="";
@@ -758,6 +756,99 @@ VCFRecord::VCFRecord(const Contig & TheContig,vector<Signature> & SignatureClust
     }
     #endif
 }
+void VCFRecord::resolveHPRecord(int * HPCounts, const Contig & TheContig,vector<Signature> & SignatureCluster, ClusterCore &Core, SegmentSet & AllPrimarySegments, float* CoverageWindows, double WholeCoverage, Arguments& Args, float * CoverageWindowsSums, float * CheckPoints, int CheckPointInterval)
+{
+    float HomoRatio=0.8f, HomoCutoffRatio=0.5f;
+    float HPRatios[3]={0,0,0};
+    for (int i=0;i<3;++i) HPRatios[i]=float(HPCounts[i])/float(SignatureCluster.size());
+    sort(SignatureCluster.begin(),SignatureCluster.end(),[](Signature &a, Signature&b){
+        return a.HP==b.HP? a<b : a.HP<b.HP;
+    });
+    int End0=0;
+    for (;End0<SignatureCluster.size();++End0) if (SignatureCluster[End0].HP!=0) break;
+    SignatureCluster.erase(SignatureCluster.begin(),SignatureCluster.begin()+End0);
+    if (HPRatios[1]/(HPRatios[1]+HPRatios[2])>HomoRatio || HPRatios[2]/(HPRatios[1]+HPRatios[2])>HomoRatio)
+    {
+        statCluster(SignatureCluster,SS,ST,SS2,ST2);
+        SVType=getSVType(SignatureCluster);
+        SVTypeI=SignatureCluster[0].SupportedSV;
+        calcM3L(SignatureCluster,true);
+        tuple<int,int,int> Site=analyzeSignatureCluster(SignatureCluster, SVType, Args);
+        int MeanSVLen=get<2>(Site);
+        SVLen=get<1>(Site);
+        Pos=get<0>(Site);//0-bsed now, after ref and alt then transform to 1-based, but should be the base before variantion. End should be the last base, but also should be transform to 1-based. So they don't change.
+        //VCF version 4.2 says if alt is <ID>, the pos is the base preceding the polymorphism. No mention of the "base 1" rule.
+        
+        if (SVLen<=0) {Keep=false;return;}
+
+        int CBegin=0, CEnd=SignatureCluster.size();
+        CR=0;
+        if (Core.End!=0)
+        {
+            CBegin=Core.Begin;
+            CEnd=Core.End;
+            CR=(CEnd-CBegin)/(SignatureCluster.size());
+        }
+
+        double LengthSD;
+        LS=getLengthSDRatioScore(SignatureCluster,MeanSVLen,&LengthSD);
+
+        if (ST>=Args.MinimumPreciseTemplates && LengthSD<Args.PreciseStandard && calcSD(BeginIter<int,vector<Signature>::iterator>(SignatureCluster.begin()),BeginIter<int,vector<Signature>::iterator>(SignatureCluster.end()))<Args.PreciseStandard && calcSD(EndIter<int,vector<Signature>::iterator>(SignatureCluster.begin()),EndIter<int,vector<Signature>::iterator>(SignatureCluster.end()))<Args.PreciseStandard) Precise=true;
+        else Precise=false;
+
+        bool HasLeft=false, HasRight=false;
+        if (SVType=="INV")
+        {
+            for (int i=0;i<SignatureCluster.size();++i)
+            {
+                HasLeft|=SignatureCluster[i].InvLeft;
+                HasRight|=SignatureCluster[i].InvRight;
+            }
+            INFO="LR=";
+            if (HasLeft) INFO+="L";
+            if (HasRight) INFO+="R";
+        }
+        double Score=ST;
+        if (Args.WeightFilter)
+        {
+            Score=getWeightSum(SignatureCluster);
+        }
+        if (Args.NoFilter) Keep=true;
+        else if (ST<2) {Keep=false;return;}
+        else if (Args.Filter2ST) Keep=true;
+        else if (ST2>30) Keep=true;
+        else
+        {
+            if (Args.CalcPosSTD || Args.MinPosSTD[SVTypeI]!=-1 || SVTypeI==1)
+            {
+                PSD=calcSD(BeginIter<int,vector<Signature>::iterator>(SignatureCluster.begin()),BeginIter<int,vector<Signature>::iterator>(SignatureCluster.end()));
+                if (Args.MinPosSTD[SVTypeI]!=-1 && PSD>Args.MinPosSTD[SVTypeI]) {Keep=false;return;}
+            }
+            double (*ASSBases)[2]=Args.ASSBases;
+            double (*ASSCoverageMulti)[2]=Args.ASSCoverageMulti;
+            double (*LSDRSs)[2]=Args.LSDRSs;
+            if (SVType=="DUP" or SVType=="INV") if (SS-ST>ST) {Keep=false;return;}
+            if (SVType=="INV")
+            {
+                Keep=true;
+                if (!(HasLeft&&HasRight)) {Keep=false;return;}
+            }
+            if (Score>=(ASSBases[SVTypeI][0]+WholeCoverage*ASSCoverageMulti[SVTypeI][0])*HomoCutoffRatio && LS>=LSDRSs[SVTypeI][0]*HomoCutoffRatio) {Keep=true;}
+            else
+            {
+                if (Score<(ASSBases[SVTypeI][1]+WholeCoverage*ASSCoverageMulti[SVTypeI][1])*HomoCutoffRatio) {Keep=false;return;}
+                if (LS<LSDRSs[SVTypeI][1]*HomoCutoffRatio) {Keep=false;return;}
+            }
+        }
+        if (SVType=="INS") InsConsensus=getInsConsensus(SVLen,SignatureCluster);
+
+        genotype(TheContig,AllPrimarySegments,CoverageWindows,CoverageWindowsSums,CheckPoints,CheckPointInterval,Args);
+        ID=".";
+        QUAL=".";
+        FILTER="PASS";
+        CHROM=TheContig.Name;
+    }
+}
 
 void VCFRecord::resolveRef(const Contig & TheContig, faidx_t * Ref, unsigned TypeCount, double CC, Arguments & Args)
 {
@@ -775,7 +866,6 @@ void VCFRecord::resolveRef(const Contig & TheContig, faidx_t * Ref, unsigned Typ
     if (OutTag)
     {
         REF=TSeq[0];
-        // if (Pos==0) ALT="<"+SVType+">"+REF;
         ALT="<"+SVType+">";//as described in VCF v4.2 example, no need to add ref
     }
     else
@@ -784,7 +874,6 @@ void VCFRecord::resolveRef(const Contig & TheContig, faidx_t * Ref, unsigned Typ
         else REF=TSeq;
         if (SVType=="DEL")
         {
-            // if (Pos==0) ALT="<DEL>"+REF[REF.length()-1];
             ALT=REF[0];
         }
         else if (SVType=="INS")
@@ -800,7 +889,7 @@ void VCFRecord::resolveRef(const Contig & TheContig, faidx_t * Ref, unsigned Typ
     free(TSeq);
     ++Pos;++End;//trans to 1-based
     if (INFO!="") INFO+=";";
-    INFO+=(Precise?"PRECISE;":"IMPRECISE;")+string("SVTYPE=")+SVType+";END="+to_string(End)+";SVLEN="+to_string(SVType=="DEL"?-SVLen:SVLen)+(SVType=="DUP"?";CN="+to_string(CN):"")+";SS="+to_string(SS)+";ST="+to_string(ST)+";LS="+to_string(LS)+";CV="+to_string(CV)+";SS2="+to_string(SS2)+";ST2="+to_string(ST2)+";CC="+to_string(CC)+";CR="+to_string(CR)+";M3L="+to_string(MinLength)+","+to_string(MediumLength)+","+to_string(MaxLength)+";PSTD="+to_string(PSD)DEBUG_CODE(+(MergeStrings==""?"":(";MSs="+MergeStrings)));
+    INFO+=(Precise?"PRECISE;":"IMPRECISE;")+string("SVTYPE=")+SVType+";END="+to_string(End)+";SVLEN="+to_string(SVType=="DEL"?-SVLen:SVLen)+(SVType=="DUP"?";CN="+to_string(CN):"")+";SS="+to_string(SS)+";ST="+to_string(ST)+";LS="+to_string(LS)+";CV="+to_string(CV)+";SS2="+to_string(SS2)+";ST2="+to_string(ST2)+";CC="+to_string(CC)+";CR="+to_string(CR)+";M3L="+to_string(MinLength)+","+to_string(MediumLength)+","+to_string(MaxLength)+";PSTD="+to_string(PSD)+";HPC="+to_string(HPCounts[0])+","+to_string(HPCounts[1])+","+to_string(HPCounts[2])DEBUG_CODE(+(MergeStrings==""?"":(";MSs="+MergeStrings)));
 }
 
 VCFRecord::operator std::string() const
@@ -840,7 +929,7 @@ inline string getDate()
 {
     time_t t = time(0);   // get time now
     tm* now = localtime(&t);
-    return to_string(now->tm_year + 1900)+(now->tm_mon<9?"0":"")+to_string((now->tm_mon + 1))+to_string(now->tm_mday);
+    return to_string(now->tm_year + 1900)+(now->tm_mon<9?"0":"")+to_string((now->tm_mon + 1))+(now->tm_mday<10?"0":"")+to_string(now->tm_mday);
 }
 
 VCFHeader::VCFHeader(const char * AReference)
@@ -901,10 +990,108 @@ void addKledEntries(VCFHeader & Header)
     Header.addHeaderEntry(HeaderEntry("INFO","CR","Core ratio.","1","Float"));
     Header.addHeaderEntry(HeaderEntry("INFO","M3L","(min length, medium length, max length).","3","Integer"));
     Header.addHeaderEntry(HeaderEntry("INFO","PSTD","Position STD, -1 if not caclulated.","1","Float"));
+    Header.addHeaderEntry(HeaderEntry("INFO","HPC","HP counts:HP0,HP1,HP2.","3","Integer"));
     DEBUG_CODE(Header.addHeaderEntry(HeaderEntry("INFO","MSs","MergeStrings.","1","String"));)
     // Header.addHeaderEntry(HeaderEntry("INFO","CS","Nearby coverage for genotyping.(by windows)","1","Float"));
     Header.addHeaderEntry(HeaderEntry("ALT","DEL","Deletion"));
     Header.addHeaderEntry(HeaderEntry("ALT","DUP","Duplication"));
     Header.addHeaderEntry(HeaderEntry("FORMAT","GT","Genotype","1","String"));
     // Header.addHeaderEntry(HeaderEntry("INFO","SCORES","Scores, supported reads, supported signatures, (begin sd+end sd)/2, length sd, number of signature source","6","Integer"));
+}
+
+void HPClustersDistinction(vector<Signature> &Cluster, vector<vector<Signature>> &HPClusters, Arguments& Args)
+{
+    HPClusters[1].clear();
+    HPClusters[2].clear();
+    double HP1Mean=0, HP2Mean=0;
+    int H1Size=0,H2Size=0;
+    double HP1SD=0, HP2SD=0;
+    
+    int Size=0;
+    double Mean=0;
+    for (int i=0;i<Cluster.size();++i)
+    {
+        if (Cluster[i].HP==1)
+        {
+            HP1Mean+=Cluster[i].Length;
+            ++H1Size;
+        }
+        if (Cluster[i].HP==2)
+        {
+            HP2Mean+=Cluster[i].Length;
+            ++H2Size;
+        }
+    }
+    HP1Mean/=(double)H1Size;
+    HP2Mean/=(double)H2Size;
+    double SD=0;
+    for (int i=0;i<Cluster.size();++i)
+    {
+        if (Cluster[i].HP==1)
+        {
+            HP1SD+=pow(((double)Cluster[i].Length-HP1Mean),2.0);
+        }
+        if (Cluster[i].HP==2)
+        {
+            HP2SD+=pow(((double)Cluster[i].Length-HP1Mean),2.0);
+        }
+    }
+    HP1SD/=(double)H1Size;
+    HP2SD/=(double)H2Size;
+    double MaxSD=max(HP1SD,HP2SD);
+    if (abs(HP1Mean-HP2Mean)>3.0*MaxSD)
+    {
+        for (int i=0;i<Cluster.size();++i)
+        {
+            if (Cluster[i].HP==0)
+            {
+                HPClusters[1].push_back(Cluster[i]);
+                HPClusters[2].push_back(Cluster[i]);
+            }
+            else
+            {
+                HPClusters[Cluster[i].HP].push_back(Cluster[i]);
+            }
+        }
+    }
+}
+
+void VCFRecord::hapGT(unsigned SmallHapCount, unsigned BigHapCount)
+{
+    double SHPRatio=float(HPCounts[1]+HPCounts[2])/float(HPCounts[0]+HPCounts[1]+HPCounts[2]);
+    double GTHPRatio=0.8;
+    if (SHPRatio>GTHPRatio)
+    {
+        mpq_t Alpha, MaxAlpha, MinAlpha;
+        mpq_init(Alpha);
+        mpq_init(MaxAlpha);
+        mpq_init(MinAlpha);
+        mpq_set_str(Alpha,"2/100000",10);
+        mpq_set_str(MaxAlpha,"5/100000",10);
+        mpq_set_str(MinAlpha,"1/1000000",10);
+        int HPCount=HPCounts[1]+HPCounts[2];
+        int MinHP=min(HPCounts[1],HPCounts[2]);
+        mpq_t MinorP,One,DefaultMinorP,MPRatio;
+        mpq_init(MinorP);
+        mpq_init(MPRatio);
+        mpq_init(One);
+        mpq_init(DefaultMinorP);
+        mpq_set_ui(One,1,1);
+        mpq_set_str(MinorP,"15/1000",10);
+        mpq_set_str(DefaultMinorP,"15/1000",10);
+        if (BigHapCount>100)
+        {
+            mpq_set_ui(MinorP,SmallHapCount,BigHapCount+SmallHapCount);
+        }
+        mpq_t PRandom;
+        mpq_init(PRandom);
+        mpq_set_ui(PRandom,0,1);
+        biCdf(PRandom,HPCount,MinorP,MinHP,HPCount);
+        if (mpq_cmp(PRandom,Alpha)<0)
+        {
+            if (Sample["GT"]!="1/1") ConcurrentGT=2;
+            else ConcurrentGT=1;
+            Sample["GT"]="1/1";
+        }
+    }
 }

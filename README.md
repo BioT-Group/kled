@@ -2,33 +2,38 @@
 ## Introduction
 Kled is designed to call SVs nicely and quickly using long-read sequencing data. It takes mapped reads file (bam) as input and reports SVs to the stdout in the VCF file format. Kled can yield precise and comprehensive SV detection results within minutes and can run on any modern computer without needing of any field knowledge of the user to perform the SV detection.
 
-## Project structure
-This project contains the source of the kled, which resides in the root path of the project, and the scripts used in the experiments, which reside in the experiments folder.
-
 ## Compiling
-Dependencies: openmp and dependencies of htslib (-lz -lm -lbz2 -llzma -lcurl -lpthread -lcrypto -ldeflate)
+Kled uses cmake build tools to build the project.
 
-Here are instructions to get some dependencies from source if systemwide installation is not available:
-- zlib: download from https://github.com/madler/zlib/releases, unzip and cd and ./configure && make && make install prefix=/path/to/your/local
-- libbz2: download from https://sourceforge.net/projects/bzip2/, unzip and cd and make && make install PREFIX=/path/to/your/local
-And export CPATH to make compiler know where the lib is: export CPATH=/path/to/your/local/include:$CPATH
+Make sure you have the following dependencies and cmake tools (>=3.15), g++ (gxx) (>=15.1):
+- zlib >=1.3
+- bzip2 >=1.0
+- liblzma-devel >=5.8
+- libcurl >=8.0
+- openssl >=3.5
+- libdeflate >=1.24
+- libboost-devel >=1.84
+- gmp >=6.3
 
-You also need a compiler that supports C++ 17 standard.
-
-To get the kled binary:
+To build the project, run:
 ```
-#to get htslib
-git submodule update --init --recursive
-
-#make kled
-make
+git clone https://github.com/CoREse/kled
+cd kled
+mkdir build
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=/your/path ..
+cmake --build . -j 16
+cmake --install .
 ```
-
-If you want to install kled:
+And you will have the kled built and kled and HapKled installed,
+### Conda
+Kled is now on bioconda! To get kled, simply:
 ```
-make install
-#or if you want to install to a place other than /usr/local:
-PREFIX=PATH_YOU_SELECT make install
+conda install kled -c bioconda
+```
+And that's all! But before that, be sure you will install kled in the right environment, to create a dedicated environment for kled:
+```
+conda create -n kled kled -c bioconda
 ```
 ## Usage
 Kled need a reference file (fasta) and at least one bam (sam/bam/cram) file that stores the mapped reads to call SVs, and output a VCF file to the standard output.
@@ -46,5 +51,43 @@ For the description of all parameters:
 kled --help
 ```
 
+## HapKled usage
+HapKled is a script that helps you handling kled with haplotype-tagged input.
+
+Before running HapKled you should first compile (see compiling the haplotype-aware kled) the haplotype-aware kled and put the path of it to the environment variable HapAwareKled.
+```
+export HapAwareKled=/path/to/hap-aware-kled
+```
+And you also need an installed Clair3 and Whatshap, and export the path of the Clair3 models to environment variable Clair3ModelPath.
+```
+export Clair3ModelPath=/path/to/bin/models
+```
+HapKled need a reference file (fasta) and at least one bam (sam/bam/cram) file that stores the mapped reads to call SVs, and output a VCF file to the standard output.
+```
+HapKled -R Refernce.fa Sample.bam > SVs.vcf
+```
+
+For the description of all parameters:
+```
+HapKled --help
+```
+
+## Change log
+- 1.2.10:
+    - Code clean.
+    - Commented out the DEBUG macro.
+    - Change the VCF date format.
+    - Change the way to calculate the run hash.
+    - Add test for cmake.
+
+## Version rule
+Version format: kled vX.Y.Z[.pN], or kled version X.Y.Z[.pN]. Where X is the major version number, Y is the algorithm version, Z is the minor version, and N is the patch number.
+
+X is updated when there is a major improvement of kled. Y is updated when there are updates that will influence the SV calling result, for example, the F1 benchmark score. Z is updated when the output VCF is changed given the same inputs (besides the running date). And pN is added when there are source code changes that do not influence the output of the build, i.e., versions with the same X.Y.Z shall have identical outputs (except for the run date) given the same inputs and parameters. X, Y, Z, and N all start with 1, and are increased by 1 on each update.
+
+This rule is applied since kled version 1.2.10.
+
 ## Citation
-This work is published in *Briefings in Bioinformatics* (https://academic.oup.com/bib/article/25/2/bbae049/7611936), please visit the site for citations.
+This work is published on [*Briefings in Bioinformatics*](https://academic.oup.com/bib/article/25/2/bbae049/7611936), doi:10.1093/bib/bbae049, please visit the site for citations.
+
+The HapKled is published on [*Frontiers in Genetics*](https://www.frontiersin.org/journals/genetics/articles/10.3389/fgene.2024.1435087/full), doi:10.3389/fgene.2024.1435087, please visit the site for citations.

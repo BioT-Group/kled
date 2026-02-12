@@ -61,9 +61,6 @@ class VCFRecord
     std::string InsConsensus;
     int SVTypeI;
     DEBUG_CODE(std::string MergeStrings;)
-    //temp
-    // double CS;
-    // std::vector<Signature> Cluster;
     public:
     std::string CHROM;
     int Pos;//0-based reference Pos of the variant, for insertion is the pos after the insertion, otherwise is the 1st base of the variant
@@ -76,6 +73,8 @@ class VCFRecord
     std::map<std::string,std::string> Sample;
 
     bool Keep;//keep this record
+    int HPCounts[3];
+    int ConcurrentGT;//Is HapGT concurrent with GT, 0: not detected, 1: concurrent, 2: not concurrent
 
     int getSVTypeI() const;
     int getPSD() const;
@@ -84,15 +83,19 @@ class VCFRecord
 
     VCFRecord();
     VCFRecord(const Contig & TheContig, std::vector<Signature> & SignatureCluster, ClusterCore &Core, SegmentSet & AllPrimarySegments, float* CoverageWindows, double WholeCoverage, Arguments &Args, float* CoverageWindowsSums=NULL, float* CheckPoints=NULL, int CheckPointInterval=0);
+    void resolveHPRecord(int* HPCounts, const Contig & TheContig, std::vector<Signature> & SignatureCluster, ClusterCore &Core, SegmentSet & AllPrimarySegments, float* CoverageWindows, double WholeCoverage, Arguments &Args, float* CoverageWindowsSums=NULL, float* CheckPoints=NULL, int CheckPointInterval=0);
     void resolveRef(const Contig & TheContig, faidx_t * Ref, unsigned TypeCount, double CC, Arguments & Args);
     std::string genotype(const Contig & TheContig, SegmentSet & AllPrimarySegments, float * CoverageWindows, float *CoverageWindowsSums, float* Checkpoints, int CheckPointInterval, Arguments & Args);
+    void hapGT(unsigned SmallHapCount, unsigned BigHapCount);
     operator std::string() const;
     bool operator<(const VCFRecord& Other) const;
-    void calcM3L(std::vector<Signature> & SignatureCluster);
+    void calcM3L(std::vector<Signature> & SignatureCluster, bool ExcludeHP0=false);
 };
 
 void addKledEntries(VCFHeader & Header);
 
 double getAverageCoverage(int Begin, int End, float * CoverageWindows, Arguments & Args, float* CoverageWindowsSums=NULL, float* CheckPoints=NULL, int CheckPointInterval=0);
+
+void HPClustersDistinction(std::vector<Signature> &Cluster, std::vector<std::vector<Signature>> &HPClusters, Arguments& Args);
 
 #endif
